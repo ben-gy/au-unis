@@ -94,6 +94,19 @@ body {
   height: 100%;
 }
 
+/* The horizontal-overflow guard belongs on the ROOT, not just on body.
+   Off-canvas `position: fixed` panels (the drill-down drawer) are not clipped
+   by body's overflow — body is not their containing block — and on iOS Safari
+   the document, not body, is the scrolling element. A guard on body alone
+   therefore protects nothing on a phone, which is exactly how a drawer parked
+   at translateX(100%) shipped as a sideways-scrolling page.
+
+   `clip`, never `hidden`: `hidden` would make this a scroll container and kill
+   position:sticky on the header. */
+html {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
@@ -849,12 +862,19 @@ svg.chart {
   padding: var(--space-xl);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  /* visibility flips only AFTER the fade completes on close, and immediately on
+     open — so the panel animates, then becomes genuinely inert (no tab stops,
+     no hit-testing, no contribution to layout overflow). */
+  visibility: hidden;
+  transition: opacity var(--transition-normal), transform var(--transition-normal),
+    visibility 0s linear var(--transition-normal);
 }
 .modal.open {
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
   transform: translate(-50%, -50%) scale(1);
+  transition: opacity var(--transition-normal), transform var(--transition-normal), visibility 0s;
 }
 .modal h2 {
   font-size: var(--font-size-xl);
@@ -900,11 +920,18 @@ svg.chart {
   box-shadow: var(--shadow-lg);
   overflow-y: auto;
   transform: translateX(100%);
-  transition: transform var(--transition-normal);
+  /* Closed, this drawer sits entirely off-canvas at [100vw, 200vw]. Left
+     merely transparent it is still a real box: iOS Safari lets the user scroll
+     sideways to it, and keyboard users tab into it. `visibility: hidden` (timed
+     to land after the slide-out) makes it inert on both counts. */
+  visibility: hidden;
+  transition: transform var(--transition-normal), visibility 0s linear var(--transition-normal);
   padding: var(--space-xl);
 }
 .drill.open {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform var(--transition-normal), visibility 0s;
 }
 .drill h2 {
   font-size: var(--font-size-xl);
@@ -1074,11 +1101,22 @@ svg.chart {
   .view-head h1 {
     font-size: var(--font-size-xl);
   }
+  /* Two rows: name + value on the first, the bar spanning the second.
+     Every cell is placed EXPLICITLY — sparse auto-placement will not back-fill
+     row 1 column 2 once the track has been placed on row 2, which orphans the
+     value onto a third row of its own, far from the name it belongs to. */
   .bar-row {
-    grid-template-columns: minmax(0, 1fr) 70px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  .bar-row .bar-label {
+    grid-area: 1 / 1 / 2 / 2;
+  }
+  .bar-row .bar-value {
+    grid-area: 1 / 2 / 2 / 3;
   }
   .bar-row .bar-track {
-    grid-column: 1 / -1;
+    grid-area: 2 / 1 / 3 / -1;
   }
   .drill {
     width: 100vw;

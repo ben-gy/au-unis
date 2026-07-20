@@ -11,12 +11,30 @@ import { glossaryTerm } from '../glossary';
 let panel: HTMLElement | null = null;
 let overlay: HTMLElement | null = null;
 let lastFocused: Element | null = null;
+let detachTimer: number | undefined;
+let escapeBound = false;
+let closeHandler: (() => void) | null = null;
+
+// Must match --transition-normal in styles.css.
+const TRANSITION_MS = 250;
 
 function ensure(onClose: () => void): { panel: HTMLElement; overlay: HTMLElement } {
+  closeHandler = onClose;
+
+  // Bound once for the life of the page, not per panel — the panel is detached
+  // and rebuilt on every close, and re-binding here would leak a listener each
+  // time a profile is opened.
+  if (!escapeBound) {
+    escapeBound = true;
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel?.classList.contains('open')) closeHandler?.();
+    });
+  }
+
   if (!panel || !overlay) {
     overlay = document.createElement('div');
     overlay.className = 'overlay';
-    overlay.addEventListener('click', onClose);
+    overlay.addEventListener('click', () => closeHandler?.());
 
     panel = document.createElement('aside');
     panel.className = 'drill';
@@ -25,18 +43,35 @@ function ensure(onClose: () => void): { panel: HTMLElement; overlay: HTMLElement
     panel.setAttribute('aria-label', 'University profile');
 
     document.body.append(overlay, panel);
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && panel?.classList.contains('open')) onClose();
-    });
   }
   return { panel, overlay };
 }
 
 export function closeDrilldown(): void {
+  if (!panel && !overlay) return;
   panel?.classList.remove('open');
   overlay?.classList.remove('open');
   if (lastFocused instanceof HTMLElement) lastFocused.focus();
+
+  // Detach once the slide-out has finished.
+  //
+  // A closed drawer left in the DOM is still a real box: it is `position: fixed`
+  // at `width: 100vw` translated to `translateX(100%)`, so it occupies
+  // [100vw, 200vw]. Desktop Chrome ignores off-viewport fixed elements when
+  // computing document scroll width, but iOS Safari does NOT — the user can
+  // scroll the whole page sideways into empty space, which is exactly what was
+  // reported. `visibility: hidden` makes it inert but does not remove the box,
+  // and a root `overflow-x: clip` only papers over it. Removing the element is
+  // the only fix that does not depend on per-browser overflow behaviour.
+  window.clearTimeout(detachTimer);
+  detachTimer = window.setTimeout(() => {
+    if (panel && !panel.classList.contains('open')) {
+      panel.remove();
+      overlay?.remove();
+      panel = null;
+      overlay = null;
+    }
+  }, TRANSITION_MS + 60);
 }
 
 function metricValue(key: string, institution: Institution): string {
