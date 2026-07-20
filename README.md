@@ -83,6 +83,25 @@ npm run data
 
 All the semantic parsing lives in `pipeline/parse.mjs`, which is pure and directly unit-tested.
 
+### A known limitation: the refresh may need to run locally
+
+`education.gov.au` does not answer from every network. GitHub-hosted runners in
+particular get connect timeouts rather than an HTTP error, so the scheduled workflow
+often cannot reach the source at all. Since that is somebody else's firewall and not a
+regression, the collector distinguishes *unreachable* from *changed*: on a transport
+failure it writes a warning to the job summary, leaves the committed data in
+`public/data/` untouched, and exits cleanly — a recurring red X that re-running cannot
+fix would be worse than useless. Any other failure, including a change in the shape of
+the source data, still fails the build loudly.
+
+The source publishes once a year, so if the scheduled run cannot reach it, refresh
+locally when the September release lands:
+
+```bash
+npm run data          # collect + aggregate
+git add public/data && git commit -m "Update data"
+```
+
 ### The traps this pipeline defends against
 
 Every one of these was found in the raw files and produces a confidently wrong number if ignored:

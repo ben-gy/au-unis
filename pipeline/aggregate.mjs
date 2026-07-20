@@ -99,7 +99,20 @@ const clean = (s) =>
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  const manifest = JSON.parse(await readFile(join(RAW, 'manifest.json'), 'utf8'));
+
+  // collect.mjs exits cleanly without downloading when the source host is
+  // unreachable (see the note there). In that case there is nothing to
+  // aggregate and the committed data must be left exactly as it is.
+  let manifestRaw;
+  try {
+    manifestRaw = await readFile(join(RAW, 'manifest.json'), 'utf8');
+  } catch {
+    process.stdout.write(
+      'No collected workbooks found — skipping aggregation and leaving public/data/ untouched.\n'
+    );
+    return;
+  }
+  const manifest = JSON.parse(manifestRaw);
   const assertions = [];
   const assert = (ok, msg) => {
     assertions.push({ ok, msg });

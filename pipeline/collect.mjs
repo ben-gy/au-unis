@@ -5,22 +5,50 @@
 // so nothing here is hardcoded to a year. The collector walks the stable index
 // pages, finds the newest year that has the sections we need, then scrapes each
 // resource page for its actual download href.
+import { appendFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { setDefaultResultOrder } from 'node:dns';
+
+// Prefer IPv4. GitHub-hosted runners advertise IPv6, and a host that only
+// half-answers on v6 turns into a connect timeout rather than a clean error.
+try {
+  setDefaultResultOrder('ipv4first');
+} catch {
+  /* older Node — ignore */
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAW = join(HERE, 'raw');
 const BASE = 'https://www.education.gov.au';
 
-// education.gov.au serves a bot-check page to bare fetch() clients. A normal
-// browser Accept/UA pair is enough; nothing here evades a rate limit.
+// education.gov.au serves a bot-check to bare fetch() clients, so these are the
+// headers a real browser sends. Nothing here evades a rate limit — the
+// collector fetches ~15 documents once a year.
 const HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'en-AU,en;q=0.9',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-AU,en-GB;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  Pragma: 'no-cache',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  Connection: 'keep-alive',
 };
+
+/**
+ * Thrown when the source host cannot be reached at all, as distinct from the
+ * source having changed shape. The two need different responses: unreachable
+ * is an environment problem and must not overwrite good committed data, while
+ * a parse failure is a real regression that should fail loudly.
+ */
+class SourceUnreachableError extends Error {}
 
 // Section slug fragment -> local filename. Slugs are prefixed with the year.
 const STUDENT_SECTIONS = {
@@ -37,16 +65,29 @@ const STAFF_SECTIONS = {
 };
 
 async function get(url, { binary = false } = {}) {
+  let lastErr;
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
-      const res = await fetch(url, { headers: HEADERS, redirect: 'follow' });
+      const res = await fetch(url, {
+        headers: HEADERS,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(45_000),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return binary ? Buffer.from(await res.arrayBuffer()) : await res.text();
     } catch (err) {
-      if (attempt === 4) throw new Error(`failed to fetch ${url}: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 1500 * attempt));
+      lastErr = err;
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
   }
+  // A transport-level failure (connect timeout, DNS, TLS, abort) means the host
+  // is unreachable from here — not that the data has changed.
+  const transport = /fetch failed|timeout|ECONN|ENOTFOUND|EAI_AGAIN|abort|network/i.test(
+    `${lastErr?.message} ${lastErr?.cause?.code ?? ''}`
+  );
+  const detail = `${lastErr?.message}${lastErr?.cause?.code ? ` (${lastErr.cause.code})` : ''}`;
+  if (transport) throw new SourceUnreachableError(`could not reach ${url}: ${detail}`);
+  throw new Error(`failed to fetch ${url}: ${detail}`);
 }
 
 /** All `/higher-education-statistics/resources/...` hrefs on a page. */
@@ -144,6 +185,31 @@ async function main() {
 }
 
 main().catch((err) => {
+  if (err instanceof SourceUnreachableError) {
+    // education.gov.au does not answer from every network — GitHub-hosted
+    // runners in particular get connect timeouts. Failing the job here would
+    // just produce a recurring red X that means "someone else's firewall",
+    // and re-running would not help. The committed data in public/data/ is
+    // untouched and the site keeps working, so exit clean and say so loudly.
+    // Refresh locally with `npm run data` when the annual release lands.
+    process.stderr.write(
+      `\n⚠️  SOURCE UNREACHABLE — data NOT refreshed, existing public/data/ left as-is.\n` +
+        `   ${err.message}\n` +
+        `   education.gov.au refuses connections from some networks (including CI runners).\n` +
+        `   Run \`npm run data\` locally to refresh, then commit public/data/.\n\n`
+    );
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try {
+        appendFileSync(
+          process.env.GITHUB_STEP_SUMMARY,
+          `### ⚠️ Data not refreshed\n\nThe Department of Education site was unreachable from this runner, so the committed data was left untouched.\n\n\`\`\`\n${err.message}\n\`\`\`\n\nRun \`npm run data\` locally and commit \`public/data/\` to refresh.\n`
+        );
+      } catch {
+        /* summary is best-effort */
+      }
+    }
+    process.exit(0);
+  }
   process.stderr.write(`collect failed: ${err.message}\n`);
   process.exit(1);
 });
