@@ -83,19 +83,21 @@ npm run data
 
 All the semantic parsing lives in `pipeline/parse.mjs`, which is pure and directly unit-tested.
 
-### A known limitation: the refresh may need to run locally
+### Reaching the source
 
-`education.gov.au` does not answer from every network. GitHub-hosted runners in
-particular get connect timeouts rather than an HTTP error, so the scheduled workflow
-often cannot reach the source at all. Since that is somebody else's firewall and not a
-regression, the collector distinguishes *unreachable* from *changed*: on a transport
-failure it writes a warning to the job summary, leaves the committed data in
-`public/data/` untouched, and exits cleanly — a recurring red X that re-running cannot
-fix would be worse than useless. Any other failure, including a change in the shape of
-the source data, still fails the build loudly.
+`education.gov.au` refuses bare `fetch()` clients, and the first CI run failed with
+connect timeouts rather than an HTTP error. Two things fix it, and both are in
+`collect.mjs`: a full set of browser headers (including the `Sec-Fetch-*` family) and
+`dns.setDefaultResultOrder('ipv4first')` — GitHub runners advertise IPv6 and the host
+only half-answers on it, which presents as a hang rather than a refusal.
 
-The source publishes once a year, so if the scheduled run cannot reach it, refresh
-locally when the September release lands:
+The collector still distinguishes *unreachable* from *changed*, because the two need
+different responses. On a transport failure it writes a warning to the job summary,
+leaves the committed data in `public/data/` untouched and exits cleanly — a recurring
+red X that re-running cannot fix would be worse than useless. Any other failure,
+including a change in the shape of the source data, fails the build loudly.
+
+To refresh by hand:
 
 ```bash
 npm run data          # collect + aggregate
