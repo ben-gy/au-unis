@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // About modal — what this is, where the numbers come from, and the four
 // specific ways this dataset will mislead you if you read it quickly.
 import type { Dataset } from '../data';

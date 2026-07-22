@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Pure parsing + normalisation for the Department of Education higher education
 // workbooks. No fs, no zlib, no network — everything here is a pure function so
 // the test suite can import it directly and CI never needs `npm install` in

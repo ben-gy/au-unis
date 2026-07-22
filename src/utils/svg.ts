@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Small SVG helpers. Building elements with createElementNS keeps data values
 // out of innerHTML entirely, so nothing here can be broken by an institution
 // name containing an ampersand or a quote.

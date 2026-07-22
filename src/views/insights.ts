@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Insights — findings computed in the pipeline, each one a click-through into
 // the view that shows the underlying data. A finding the reader cannot verify
 // is just an assertion, so every card leads somewhere.

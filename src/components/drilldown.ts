@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Per-institution drill-down. Hash-linkable (#i=3040) so a profile can be
 // shared directly — which matters when the visitor is a student sending a
 // university to a parent.

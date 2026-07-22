@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Display formatting. Every formatter takes `number | null` and renders null
 // as an explicit "not published" rather than 0, — or an empty cell, both of
 // which read as a real value.

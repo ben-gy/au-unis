@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Ben Richardson — https://benrichardson.dev
+// Additional terms under AGPL-3.0 section 7(b) apply; see ADDITIONAL-TERMS.md.
 // Minimal ZIP reader — enough to read an .xlsx (which is a ZIP of XML parts).
 //
 // Deliberately dependency-free. Adding a package here would mean the data
